@@ -1,0 +1,89 @@
+# ==============================
+# Python & Environment
+# ==============================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+.env/
+
+# ==============================
+# Local Configuration & Secrets
+# ==============================
+# Ignores the file containing the local DATA_DIR path
+.env
+
+# ==============================
+# IDEs & OS Files
+# ==============================
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ==============================
+# Data, Media & 3D Artifacts
+# ==============================
+# Enforce the rule: No data in the core repo
+data/
+datasets/
+output/
+outputs/
+
+# Video & Image sequences
+*.mp4
+*.mov
+*.avi
+*.jpg
+*.jpeg
+*.png
+
+# 3D Point Clouds & Geometry
+*.ply
+*.pcd
+*.obj
+*.mtl
+
+# Numpy/Data dumps
+*.npy
+*.npz
+
+# ==============================
+# Deep Learning Weights
+# ==============================
+# Ignore pre-trained models downloaded for SuperPoint/LightGlue
+*.pt
+*.pth
+weights/
+checkpoints/
