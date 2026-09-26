@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "incremental-sfm"
+version = "1.0.0"
+description = "Incremental Structure from Motion Pipeline"
+requires-python = ">=3.10"
+dependencies = [
+    "opencv-python>=4.8.0",
+    "numpy>=1.24.0",
+    "python-dotenv>=1.0.0",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "lightglue @ git+https://github.com/cvg/LightGlue.git@v0.2"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.1.0,<10.0.0",
+    "pytest-mock>=3.15.1,<4.0.0",
+    "ruff>=0.15.0,<0.16.0"
+]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    'ignore:.*torch\.jit\.script.*is deprecated.*:FutureWarning',
+    'ignore:.*torch\.cuda\.amp\.custom_fwd.*:FutureWarning'
+]
+
+[tool.ruff]
+line-length = 88
