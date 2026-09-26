@@ -55,7 +55,6 @@ Thumbs.db
 # ==============================
 # Data, Media & 3D Artifacts
 # ==============================
-# Enforce the rule: No data in the core repo
 data/
 datasets/
 output/
