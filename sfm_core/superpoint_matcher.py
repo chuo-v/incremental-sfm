@@ -1,3 +1,4 @@
+import logging
 import cv2
 import torch
 import numpy as np
@@ -6,6 +7,8 @@ from config import config
 from sfm_core.feature_matcher import BaseFeatureMatcher
 from lightglue import SuperPoint, LightGlue
 from lightglue.utils import rbd
+
+logger = logging.getLogger(__name__)
 
 
 class SuperPointMatcher(BaseFeatureMatcher):
@@ -27,7 +30,7 @@ class SuperPointMatcher(BaseFeatureMatcher):
         else:
             self.device = torch.device("cpu")
 
-        print(f"Initializing SuperPoint & LightGlue on device: {self.device}")
+        logger.info(f"Initializing SuperPoint & LightGlue on device: {self.device}")
 
         # Initialize the feature extractor and matcher, explicitly setting to eval mode
         self.extractor = (
@@ -44,10 +47,8 @@ class SuperPointMatcher(BaseFeatureMatcher):
     def _preprocess_image(self, img: np.ndarray) -> torch.Tensor:
         """
         Converts an OpenCV grayscale (H, W) array into a normalized PyTorch tensor.
-
         Args:
             img: (H, W) 8-bit grayscale image array.
-
         Returns:
             torch.Tensor: Normalized float32 tensor of shape (1, 1, H, W) located on the target device.
         """
@@ -59,11 +60,9 @@ class SuperPointMatcher(BaseFeatureMatcher):
     ) -> tuple[np.ndarray, np.ndarray]:
         """
         Detects and matches features between two images using SuperPoint and LightGlue.
-
         Args:
             img1: (H, W) grayscale array of the first image.
             img2: (H, W) grayscale array of the second image.
-
         Returns:
             pts1: (N, 2) array of matched (x, y) coordinates in the first image.
             pts2: (N, 2) array of matched (x, y) coordinates in the second image.
@@ -81,7 +80,6 @@ class SuperPointMatcher(BaseFeatureMatcher):
             # Extract keypoints and descriptors
             feats1 = self.extractor.extract(tensor1)
             feats2 = self.extractor.extract(tensor2)
-
             # Perform feature matching
             matches01 = self.matcher({"image0": feats1, "image1": feats2})
 

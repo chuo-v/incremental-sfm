@@ -1,4 +1,7 @@
+import logging
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 def export_point_cloud_ply(
@@ -8,10 +11,10 @@ def export_point_cloud_ply(
     Exports a 3D point cloud with colors to a standard ASCII PLY file.
     """
     if not points:
-        print("Warning: Point cloud is empty. No PLY file generated.")
+        logger.warning("Point cloud is empty. No PLY file generated.")
         return
 
-    print(f"Exporting {len(points)} points to {filename}...")
+    logger.info(f"Exporting {len(points)} points to {filename}...")
 
     with open(filename, "w") as f:
         # Write PLY Header
@@ -33,4 +36,4 @@ def export_point_cloud_ply(
             # Ensure colors are cast to standard 8-bit unsigned integers for the PLY format
             f.write(f"{x} {y} {z} {int(r)} {int(g)} {int(b)}\n")
 
-    print("Export complete.")
+    logger.info("Export complete.")

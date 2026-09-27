@@ -1,3 +1,4 @@
+import logging
 import time
 import numpy as np
 
@@ -7,6 +8,8 @@ from sfm_core.geometry import GeometryEngine
 from sfm_core.orb_matcher import ORBMatcher
 from sfm_core.sift_matcher import SIFTMatcher
 from sfm_core.superpoint_matcher import SuperPointMatcher
+
+logger = logging.getLogger(__name__)
 
 
 class IncrementalSfMEngine:
@@ -86,13 +89,12 @@ class IncrementalSfMEngine:
             bool: True if two-view initialization was successful, False otherwise.
         """
         start_time = time.perf_counter()
-        print("Initializing Two-View Seed (Images 0 and 1)...")
+        logger.info("Initializing Two-View Seed (Images 0 and 1)...")
 
         rgb0, gray0 = self._get_cached_image(0)
         _, gray1 = self._get_cached_image(1)
 
         pts0, pts1 = self.matcher.match(gray0, gray1)
-
         if len(pts0) < 8:
             return False
 
@@ -108,7 +110,6 @@ class IncrementalSfMEngine:
         # Define Camera 0 at the origin
         R0 = np.eye(3, dtype=np.float32)
         t0 = np.zeros((3, 1), dtype=np.float32)
-
         self.camera_poses[0] = (R0, t0)
         self.camera_poses[1] = (R1, t1)
 
@@ -124,8 +125,8 @@ class IncrementalSfMEngine:
             pt3d = pts3D[i]
             pt2d_0 = valid_pts0[i]
             pt2d_1 = valid_pts1[i]
-            x, y = int(pt2d_0[0]), int(pt2d_0[1])
 
+            x, y = int(pt2d_0[0]), int(pt2d_0[1])
             color = (
                 rgb0[y, x]
                 if 0 <= y < rgb0.shape[0] and 0 <= x < rgb0.shape[1]
@@ -134,10 +135,9 @@ class IncrementalSfMEngine:
 
             self.point_cloud.append(pt3d)
             self.point_colors.append(color)
-
             point_idx = len(self.point_cloud) - 1
-            key_0, key_1 = self._pt_key(pt2d_0), self._pt_key(pt2d_1)
 
+            key_0, key_1 = self._pt_key(pt2d_0), self._pt_key(pt2d_1)
             self.last_frame_2d_to_3d[key_1] = point_idx
             self.obs2d_to_3d[(0, key_0)] = point_idx
             self.obs2d_to_3d[(1, key_1)] = point_idx
@@ -155,7 +155,7 @@ class IncrementalSfMEngine:
             "time_seconds": elapsed_time,
         }
 
-        print(
+        logger.info(
             f"Two-View Initialization complete ({elapsed_time}s). Seeded {len(self.point_cloud)} 3D points."
         )
         return True
@@ -232,7 +232,7 @@ class IncrementalSfMEngine:
             tuple: A boolean indicating success, followed by the recovered rotation matrix,
                    translation vector, inliers, associations, and multi-view unassociated tracks.
         """
-        print(
+        logger.warning(
             f"Sequential tracking lost at Image {curr_idx}. Triggering Global Relocalization..."
         )
 
@@ -245,6 +245,7 @@ class IncrementalSfMEngine:
 
             _, g_prev = self._get_cached_image(prev_idx)
             p_prev, p_curr = self.matcher.match(g_prev, gray_curr)
+
             if len(p_prev) < 8:
                 continue
 
@@ -258,8 +259,8 @@ class IncrementalSfMEngine:
             for j in range(len(valid_prev)):
                 pt_p, pt_c = valid_prev[j], valid_curr[j]
                 key_p, key_c = self._pt_key(pt_p), self._pt_key(pt_c)
-                obs_key = (prev_idx, key_p)
 
+                obs_key = (prev_idx, key_p)
                 if obs_key in self.obs2d_to_3d:
                     if key_c not in curr_to_3d_multi:
                         curr_to_3d_multi[key_c] = (pt_c, self.obs2d_to_3d[obs_key])
@@ -287,8 +288,9 @@ class IncrementalSfMEngine:
             R_curr, t_curr, inlier_mask = GeometryEngine.solve_pnp(
                 np.array(obj_pts_multi), np.array(img_pts_multi), self.K
             )
+
             if R_curr.size > 0:
-                print(
+                logger.info(
                     f"Relocalization successful. Recovered {len(inlier_mask)} global inliers."
                 )
 
@@ -377,10 +379,9 @@ class IncrementalSfMEngine:
 
             self.point_cloud.append(pt3d)
             self.point_colors.append(color)
-
             pt3d_idx = len(self.point_cloud) - 1
-            key_p, key_c = self._pt_key(pt2d_p), self._pt_key(pt2d_c)
 
+            key_p, key_c = self._pt_key(pt2d_p), self._pt_key(pt2d_c)
             new_2d_to_3d[key_c] = pt3d_idx
             self.obs2d_to_3d[(last_success_idx, key_p)] = pt3d_idx
             self.obs2d_to_3d[(curr_idx, key_c)] = pt3d_idx
@@ -421,6 +422,7 @@ class IncrementalSfMEngine:
                 (R_curr, t_curr)
             ]
             pts2d = [pt_p for _, pt_p in track] + [pt_c]
+
             pt3d = GeometryEngine.triangulate_n_views(poses, pts2d, self.K)
 
             valid = True
@@ -445,9 +447,9 @@ class IncrementalSfMEngine:
                         if 0 <= y < rgb_curr.shape[0] and 0 <= x < rgb_curr.shape[1]
                         else np.array([0, 0, 0])
                     )
+
                     self.point_cloud.append(pt3d)
                     self.point_colors.append(color)
-
                     pt3d_idx = len(self.point_cloud) - 1
                     new_2d_to_3d[key_c] = pt3d_idx
                     self.obs2d_to_3d[(curr_idx, key_c)] = pt3d_idx
@@ -468,18 +470,17 @@ class IncrementalSfMEngine:
         pipeline_start_time = time.perf_counter()
 
         if not self.initialize_two_view():
-            print("Failed to initialize two-view seed. Pipeline aborted.")
+            logger.error("Failed to initialize two-view seed. Pipeline aborted.")
             return
 
         num_images = len(self.data_loader)
         frame_times = []
-
         # Track the last successfully registered frame
         last_success_idx = 1
 
         for i in range(2, num_images):
             frame_start_time = time.perf_counter()
-            print(f"Processing Image {i} / {num_images - 1}...")
+            logger.info(f"Processing Image {i} / {num_images - 1}...")
 
             rgb_curr, gray_curr = self._get_cached_image(i)
             rgb_prev, gray_prev = self._get_cached_image(last_success_idx)
@@ -521,7 +522,7 @@ class IncrementalSfMEngine:
                 )
 
             if R_curr.size == 0:
-                print(f"PnP failed for image {i}. Registration skipped.")
+                logger.warning(f"PnP failed for image {i}. Registration skipped.")
                 continue
 
             # -------------------------------------------------------------
@@ -531,6 +532,7 @@ class IncrementalSfMEngine:
 
             inlier_obj_pts = np.array(obj_pts)[inlier_mask]
             inlier_img_pts = np.array(img_pts)[inlier_mask]
+
             rmse = GeometryEngine.calculate_reprojection_error(
                 inlier_obj_pts, inlier_img_pts, R_curr, t_curr, self.K
             )
@@ -568,7 +570,7 @@ class IncrementalSfMEngine:
             frame_elapsed = round(time.perf_counter() - frame_start_time, 3)
             frame_times.append(frame_elapsed)
 
-            print(
+            logger.info(
                 f"Registered Image {i} ({frame_elapsed}s): {len(inlier_mask)} PnP Inliers | {num_triangulated} Triangulated Points"
             )
 
@@ -596,8 +598,8 @@ class IncrementalSfMEngine:
             "avg_frame_time_seconds": avg_frame_time,
         }
 
-        print("=" * 30)
-        print(
+        logger.info("=" * 30)
+        logger.info(
             f"Incremental SfM Pipeline complete in {total_elapsed}s.\n"
             f"Total 3D points: {len(self.point_cloud)} | "
             f"Overall RMSE: {self.overall_rmse:.3f} px | "

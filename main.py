@@ -1,6 +1,13 @@
 import argparse
 import json
+import logging
 import warnings
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 # Suppress upstream PyTorch deprecation warnings before loading the pipeline
 warnings.filterwarnings(
@@ -20,7 +27,6 @@ def build_parser() -> argparse.ArgumentParser:
     Constructs and returns the Command Line Interface (CLI) argument parser.
     Defines required parameters (e.g., dataset name) and optional overrides
     that map directly to the global configuration variables in config.py.
-
     Returns:
         argparse.ArgumentParser: The configured parser object.
     """
@@ -40,7 +46,6 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["SIFT", "SuperPoint", "ORB"],
         help="Feature matching algorithm to use",
     )
-
     # Optional Configuration Overrides
     parser.add_argument(
         "--downscale_factor",
@@ -90,7 +95,6 @@ def build_parser() -> argparse.ArgumentParser:
 def main():
     """
     Orchestrates the complete Incremental Structure from Motion (SfM) pipeline execution.
-
     Workflow:
         1. Parses CLI arguments and applies any optional configuration overrides.
         2. Initializes the IncrementalSfMEngine with the specified dataset and matcher.
@@ -117,12 +121,12 @@ def main():
     if args.min_parallax_degrees is not None:
         config.min_parallax_degrees = args.min_parallax_degrees
 
-    print("=" * 30)
-    print("Starting Incremental SfM Pipeline")
-    print(f"Dataset: {args.dataset}")
-    print(f"Matcher: {args.matcher}")
-    print(f"Data Directory: {config.data_dir}")
-    print("=" * 30)
+    logger.info("=" * 30)
+    logger.info("Starting Incremental SfM Pipeline")
+    logger.info(f"Dataset: {args.dataset}")
+    logger.info(f"Matcher: {args.matcher}")
+    logger.info(f"Data Directory: {config.data_dir}")
+    logger.info("=" * 30)
 
     # Initialize and run the core engine
     engine = IncrementalSfMEngine(dataset_name=args.dataset, matcher_type=args.matcher)
@@ -132,7 +136,6 @@ def main():
     output_dir = config.data_dir / args.dataset / "output"
     pc_dir = output_dir / "point_clouds"
     metrics_dir = output_dir / "metrics"
-
     pc_dir.mkdir(parents=True, exist_ok=True)
     metrics_dir.mkdir(parents=True, exist_ok=True)
 
@@ -162,12 +165,12 @@ def main():
     with open(metrics_file, "w") as f:
         json.dump(run_data, f, indent=4)
 
-    print("=" * 30)
-    print("Pipeline Execution Complete")
-    print(f"Dataset: {args.dataset}")
-    print(f"Matcher: {args.matcher}")
-    print(f"Metrics saved to: {metrics_file}")
-    print("=" * 30)
+    logger.info("=" * 30)
+    logger.info("Pipeline Execution Complete")
+    logger.info(f"Dataset: {args.dataset}")
+    logger.info(f"Matcher: {args.matcher}")
+    logger.info(f"Metrics saved to: {metrics_file}")
+    logger.info("=" * 30)
 
 
 if __name__ == "__main__":
