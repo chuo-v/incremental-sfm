@@ -16,24 +16,31 @@ def export_point_cloud_ply(
 
     logger.info(f"Exporting {len(points)} points to {filename}...")
 
-    with open(filename, "w") as f:
-        # Write PLY Header
-        f.write("ply\n")
-        f.write("format ascii 1.0\n")
-        f.write(f"element vertex {len(points)}\n")
-        f.write("property float x\n")
-        f.write("property float y\n")
-        f.write("property float z\n")
-        f.write("property uchar red\n")
-        f.write("property uchar green\n")
-        f.write("property uchar blue\n")
-        f.write("end_header\n")
+    pts_arr = np.asarray(points, dtype=np.float32)
+    color_arr = np.asarray(colors, dtype=np.uint8)
 
-        # Write Vertex Data
-        for i in range(len(points)):
-            x, y, z = points[i]
-            r, g, b = colors[i]
-            # Ensure colors are cast to standard 8-bit unsigned integers for the PLY format
-            f.write(f"{x} {y} {z} {int(r)} {int(g)} {int(b)}\n")
+    data = np.hstack((pts_arr, color_arr))
+
+    # Define the standard PLY header
+    header = (
+        "ply\n"
+        "format ascii 1.0\n"
+        f"element vertex {len(points)}\n"
+        "property float x\n"
+        "property float y\n"
+        "property float z\n"
+        "property uchar red\n"
+        "property uchar green\n"
+        "property uchar blue\n"
+        "end_header"
+    )
+
+    np.savetxt(
+        filename,
+        data,
+        fmt="%f %f %f %d %d %d",
+        header=header,
+        comments="",  # Prevent savetxt from prepending '#' to the header lines
+    )
 
     logger.info("Export complete.")
