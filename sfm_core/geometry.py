@@ -276,3 +276,32 @@ class GeometryEngine:
         errors = np.linalg.norm(np.float32(img_pts) - projected_pts, axis=1)
 
         return float(np.sqrt(np.mean(errors**2)))
+
+    @staticmethod
+    def calculate_multi_view_reprojection_error(
+        pt3d: np.ndarray,
+        poses: list[tuple[np.ndarray, np.ndarray]],
+        pts2d: list[np.ndarray],
+        K: np.ndarray,
+    ) -> float:
+        """
+        Efficiently calculates the Root Mean Square Error (RMSE) of a 3D point
+        projected across multiple camera poses using direct pinhole projection
+        (assuming zero distortion).
+        """
+        fx, fy, cx, cy = K[0, 0], K[1, 1], K[0, 2], K[1, 2]
+        X = np.asarray(pt3d, dtype=np.float32).reshape(3, 1)
+        squared_errors = []
+        for (R, t), pt2d in zip(poses, pts2d):
+            X_cam = R @ X + t
+            z = X_cam[2, 0]
+            if z <= 0:
+                return float("inf")
+            u = fx * (X_cam[0, 0] / z) + cx
+            v = fy * (X_cam[1, 0] / z) + cy
+            dx = u - pt2d[0]
+            dy = v - pt2d[1]
+            squared_errors.append(dx * dx + dy * dy)
+        if not squared_errors:
+            return 0.0
+        return float(np.sqrt(np.mean(squared_errors)))

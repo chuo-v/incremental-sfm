@@ -441,14 +441,10 @@ class IncrementalSfMEngine:
                     break
 
             if valid:
-                errors = []
-                for (R, t), pt2d in zip(poses, pts2d):
-                    err = GeometryEngine.calculate_reprojection_error(
-                        np.array([pt3d]), np.array([pt2d]), R, t, self.K
-                    )
-                    errors.append(err)
-
-                if np.mean(errors) < config.ransac_threshold:
+                mean_err = GeometryEngine.calculate_multi_view_reprojection_error(
+                    pt3d, poses, pts2d, self.K
+                )
+                if mean_err < config.ransac_threshold:
                     x, y = int(pt_c[0]), int(pt_c[1])
                     color = (
                         rgb_curr[y, x]
