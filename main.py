@@ -54,6 +54,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override downscale_factor from config.py",
     )
     parser.add_argument(
+        "--max_cache_size",
+        type=int,
+        default=None,
+        help="Override max_cache_size from config.py",
+    )
+    parser.add_argument(
         "--max_features",
         type=int,
         default=None,
@@ -108,6 +114,8 @@ def main():
     # Apply Optional Overrides to the Global Config Object
     if args.downscale_factor is not None:
         config.downscale_factor = args.downscale_factor
+    if args.max_cache_size is not None:
+        config.max_cache_size = args.max_cache_size
     if args.max_features is not None:
         config.max_features = args.max_features
     if args.lowe_ratio_threshold is not None:
@@ -152,6 +160,7 @@ def main():
         "matcher": args.matcher,
         "config": {
             "downscale_factor": config.downscale_factor,
+            "max_cache_size": config.max_cache_size,
             "max_features": config.max_features,
             "lowe_ratio_threshold": config.lowe_ratio_threshold,
             "apply_clahe": getattr(config, "apply_clahe", False),

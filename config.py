@@ -28,6 +28,9 @@ class PipelineConfig:
     # The camera intrinsic matrix (K) is automatically scaled to match this factor.
     downscale_factor: float = 1.0
 
+    # Maximum number of uncompressed image arrays to hold in RAM.
+    max_cache_size: int = 15
+
     # ------------------------------
     # Feature Matching
     # ------------------------------
