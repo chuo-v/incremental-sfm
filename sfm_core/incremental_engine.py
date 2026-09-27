@@ -77,7 +77,7 @@ class IncrementalSfMEngine:
         Returns:
             tuple[float, float]: The rounded (x, y) coordinate tuple.
         """
-        return (round(float(pt[0]), 1), round(float(pt[1]), 1))
+        return (round(float(pt[0]), 4), round(float(pt[1]), 4))
 
     def initialize_two_view(self) -> bool:
         """
