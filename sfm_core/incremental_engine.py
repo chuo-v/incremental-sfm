@@ -53,18 +53,26 @@ class IncrementalSfMEngine:
         # Structured run metrics
         self.metrics = {"initialization": {}, "frames": [], "summary": {}}
 
-    def _get_cached_image(self, index: int):
+    def _get_cached_image(self, index: int, max_cache_size: int = 15):
         """
         Loads and caches images into RAM to accelerate multi-view matching.
+        Enforces a bounded cache size to prevent Out-Of-Memory (OOM) errors.
 
         Args:
             index (int): The sequential index of the image to load.
+            max_cache_size (int): Maximum number of images to hold in memory.
 
         Returns:
             tuple: A tuple containing the RGB image array and grayscale image array.
         """
         if index not in self.image_cache:
+            # Enforce cache limit by removing the oldest inserted key
+            if len(self.image_cache) >= max_cache_size:
+                oldest_key = next(iter(self.image_cache))
+                del self.image_cache[oldest_key]
+
             self.image_cache[index] = self.data_loader.get_image(index)
+
         return self.image_cache[index]
 
     def _pt_key(self, pt: np.ndarray) -> tuple[float, float]:
