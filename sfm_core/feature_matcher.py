@@ -27,8 +27,8 @@ class BaseFeatureMatcher(ABC):
         if des1 is None or des2 is None or len(des1) < 2 or len(des2) < 2:
             return np.empty((0, 2)), np.empty((0, 2))
 
+        # Execute the forward KNN match
         knn_1_to_2 = matcher.knnMatch(des1, des2, k=2)
-        knn_2_to_1 = matcher.knnMatch(des2, des1, k=2)
 
         # Lowe's Ratio Test (Forward)
         good_1_to_2 = {}
@@ -37,6 +37,20 @@ class BaseFeatureMatcher(ABC):
                 m, n = match_set
                 if m.distance < config.lowe_ratio_threshold * n.distance:
                     good_1_to_2[m.queryIdx] = m.trainIdx
+
+        if getattr(config, "disable_symmetric_matching", False):
+            pts1, pts2 = [], []
+            for idx1, idx2 in good_1_to_2.items():
+                pts1.append(kp1[idx1].pt)
+                pts2.append(kp2[idx2].pt)
+            pts1 = np.array(pts1)
+            pts2 = np.array(pts2)
+            if len(pts1) == 0:
+                return np.empty((0, 2)), np.empty((0, 2))
+            return pts1, pts2
+
+        # Execute the backward KNN match if symmetric matching is enabled
+        knn_2_to_1 = matcher.knnMatch(des2, des1, k=2)
 
         # Lowe's Ratio Test (Backward)
         good_2_to_1 = {}

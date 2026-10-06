@@ -78,6 +78,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override apply_clahe (use --apply_clahe or --no-apply_clahe)",
     )
     parser.add_argument(
+        "--disable_symmetric_matching",
+        action="store_true",
+        help="Disable symmetric cross-check matching",
+    )
+    parser.add_argument(
         "--ransac_prob",
         type=float,
         default=None,
@@ -122,6 +127,8 @@ def main():
         config.lowe_ratio_threshold = args.lowe_ratio_threshold
     if args.apply_clahe is not None:
         config.apply_clahe = args.apply_clahe
+    if args.disable_symmetric_matching:
+        config.disable_symmetric_matching = True
     if args.ransac_prob is not None:
         config.ransac_prob = args.ransac_prob
     if args.ransac_threshold is not None:
@@ -164,6 +171,7 @@ def main():
             "max_features": config.max_features,
             "lowe_ratio_threshold": config.lowe_ratio_threshold,
             "apply_clahe": getattr(config, "apply_clahe", False),
+            "disable_symmetric_matching": getattr(config, "disable_symmetric_matching", False),
             "ransac_prob": config.ransac_prob,
             "ransac_threshold": config.ransac_threshold,
             "min_parallax_degrees": config.min_parallax_degrees,

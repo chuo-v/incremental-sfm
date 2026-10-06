@@ -43,6 +43,9 @@ class PipelineConfig:
     # Applies Contrast Limited Adaptive Histogram Equalization to enhance local contrast prior to extraction.
     apply_clahe: bool = True
 
+    # Disables symmetric cross-check matching, halving feature matching time at the cost of outlier rejection.
+    disable_symmetric_matching: bool = False
+
     # ------------------------------
     # Geometry & RANSAC Thresholds
     # ------------------------------
