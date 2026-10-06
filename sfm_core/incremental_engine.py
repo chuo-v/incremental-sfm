@@ -578,11 +578,13 @@ class IncrementalSfMEngine:
             self.metrics["frames"].append(
                 {
                     "image_index": i,
+                    "raw_matches": len(pts_curr),
                     "associations": len(obj_pts),
                     "pnp_inliers": len(inlier_mask),
                     "triangulated_points": num_triangulated,
                     "rmse": rmse,
                     "time_seconds": frame_elapsed,
+                    "is_relocalized": relocalized,
                 }
             )
 
