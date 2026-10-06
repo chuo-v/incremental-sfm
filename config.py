@@ -46,6 +46,11 @@ class PipelineConfig:
     # Disables symmetric cross-check matching, halving feature matching time at the cost of outlier rejection.
     disable_symmetric_matching: bool = False
 
+    # Converts SIFT descriptors to RootSIFT (L1 norm followed by square root) to improve
+    # match distinctiveness. Note: Enabling this transformation introduces additional
+    # array operations during extraction, which may noticeably increase overall processing time.
+    use_root_sift: bool = False
+
     # ------------------------------
     # Geometry & RANSAC Thresholds
     # ------------------------------

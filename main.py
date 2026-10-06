@@ -83,6 +83,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Disable symmetric cross-check matching",
     )
     parser.add_argument(
+        "--use_root_sift",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Override use_root_sift (use --use_root_sift or --no-use_root_sift). Only applies when --matcher=SIFT.",
+    )
+    parser.add_argument(
         "--ransac_prob",
         type=float,
         default=None,
@@ -129,6 +135,13 @@ def main():
         config.apply_clahe = args.apply_clahe
     if args.disable_symmetric_matching:
         config.disable_symmetric_matching = True
+    if args.use_root_sift is not None:
+        if args.matcher != "SIFT":
+            logger.warning(
+                f"The RootSIFT override was passed, but the current matcher is {args.matcher}. "
+                "This setting only applies to SIFT and will be ignored."
+            )
+        config.use_root_sift = args.use_root_sift
     if args.ransac_prob is not None:
         config.ransac_prob = args.ransac_prob
     if args.ransac_threshold is not None:
@@ -171,7 +184,10 @@ def main():
             "max_features": config.max_features,
             "lowe_ratio_threshold": config.lowe_ratio_threshold,
             "apply_clahe": getattr(config, "apply_clahe", False),
-            "disable_symmetric_matching": getattr(config, "disable_symmetric_matching", False),
+            "disable_symmetric_matching": getattr(
+                config, "disable_symmetric_matching", False
+            ),
+            "use_root_sift": getattr(config, "use_root_sift", False),
             "ransac_prob": config.ransac_prob,
             "ransac_threshold": config.ransac_threshold,
             "min_parallax_degrees": config.min_parallax_degrees,

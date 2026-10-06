@@ -31,6 +31,22 @@ class SIFTMatcher(BaseFeatureMatcher):
         else:
             self.clahe = None
 
+    def _to_root_sift(self, des: np.ndarray) -> np.ndarray:
+        """
+        Converts standard SIFT descriptors to RootSIFT.
+        """
+        if des is None or len(des) == 0:
+            return des
+
+        # Apply L1 normalization (sum along the feature axis)
+        l1_norm = np.linalg.norm(des, ord=1, axis=1, keepdims=True)
+        # Prevent division by zero for any empty descriptors
+        l1_norm[l1_norm == 0] = 1e-7
+        # Element-wise square root on the normalized descriptors
+        root_des = np.sqrt(des / l1_norm)
+
+        return root_des.astype(np.float32)
+
     def match(
         self, img1: np.ndarray, img2: np.ndarray
     ) -> tuple[np.ndarray, np.ndarray]:
@@ -54,6 +70,11 @@ class SIFTMatcher(BaseFeatureMatcher):
         # Extract keypoints (kp) and descriptors (des)
         kp1, des1 = self.sift.detectAndCompute(img1, None)
         kp2, des2 = self.sift.detectAndCompute(img2, None)
+
+        # Apply RootSIFT conversion if enabled
+        if getattr(config, "use_root_sift", False):
+            des1 = self._to_root_sift(des1)
+            des2 = self._to_root_sift(des2)
 
         pts1, pts2 = self._bidirectional_match(self.matcher, kp1, kp2, des1, des2)
 
