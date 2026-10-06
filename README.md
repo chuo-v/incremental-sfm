@@ -38,7 +38,7 @@ python main.py --dataset <dataset_folder_name> --matcher <MATCHER_TYPE>
 ```
 * **`--dataset`** *(Required)*: The exact name of the dataset folder residing inside your configured `DATA_DIR`.
 * **`--matcher`** *(Optional)*: The feature matching algorithm to use (`SIFT`, `SuperPoint`, or `ORB`). If omitted, defaults to `SIFT`.
-* **Configuration Overrides** *(Optional)*: Pipeline thresholds can be overridden at runtime using flags such as `--downscale_factor`, `--ransac_threshold`, or `--apply_clahe` / `--no-apply_clahe`. For the exhaustive list of overrides, run `python main.py --help` or refer to [`config.py`](./config.py).
+* **Configuration Overrides** *(Optional)*: Pipeline thresholds can be overridden at runtime using flags such as `--downscale-factor`, `--ransac-threshold`, or `--apply-clahe` / `--no-apply-clahe`. For the exhaustive list of overrides, run `python main.py --help` or refer to [`config.py`](./config.py).
 
 ## Outputs
 

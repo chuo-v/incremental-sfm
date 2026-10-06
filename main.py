@@ -48,60 +48,60 @@ def build_parser() -> argparse.ArgumentParser:
     )
     # Optional Configuration Overrides
     parser.add_argument(
-        "--downscale_factor",
+        "--downscale-factor",
         type=float,
         default=None,
         help="Override downscale_factor from config.py",
     )
     parser.add_argument(
-        "--max_cache_size",
+        "--max-cache-size",
         type=int,
         default=None,
         help="Override max_cache_size from config.py",
     )
     parser.add_argument(
-        "--max_features",
+        "--max-features",
         type=int,
         default=None,
         help="Override max_features from config.py",
     )
     parser.add_argument(
-        "--lowe_ratio_threshold",
+        "--lowe-ratio-threshold",
         type=float,
         default=None,
         help="Override lowe_ratio_threshold from config.py",
     )
     parser.add_argument(
-        "--apply_clahe",
+        "--apply-clahe",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help="Override apply_clahe (use --apply_clahe or --no-apply_clahe)",
+        help="Override apply_clahe (use --apply-clahe or --no-apply-clahe)",
     )
     parser.add_argument(
-        "--disable_symmetric_matching",
+        "--disable-symmetric-matching",
         action="store_true",
         help="Disable symmetric cross-check matching",
     )
     parser.add_argument(
-        "--use_root_sift",
+        "--use-root-sift",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help="Override use_root_sift (use --use_root_sift or --no-use_root_sift). Only applies when --matcher=SIFT.",
+        help="Override use_root_sift (use --use-root-sift or --no-use-root-sift). Only applies when --matcher=SIFT.",
     )
     parser.add_argument(
-        "--ransac_prob",
+        "--ransac-prob",
         type=float,
         default=None,
         help="Override ransac_prob from config.py",
     )
     parser.add_argument(
-        "--ransac_threshold",
+        "--ransac-threshold",
         type=float,
         default=None,
         help="Override ransac_threshold from config.py",
     )
     parser.add_argument(
-        "--min_parallax_degrees",
+        "--min-parallax-degrees",
         type=float,
         default=None,
         help="Override min_parallax_degrees from config.py",
