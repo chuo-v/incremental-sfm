@@ -323,6 +323,8 @@ class IncrementalSfMEngine:
     ) -> int:
         """
         Executes fast epipolar triangulation strictly against the previous anchor frame.
+        Utilizes vectorized reprojection error calculation to batch-filter outliers
+        before mapping the surviving points and extracting their colors.
 
         Args:
             curr_idx (int): The current image index.
@@ -356,26 +358,31 @@ class IncrementalSfMEngine:
             t_curr,
         )
 
-        valid_unassoc_p, valid_unassoc_c = (
-            unassoc_p[valid_mask_new],
-            unassoc_c[valid_mask_new],
+        valid_unassoc_p = unassoc_p[valid_mask_new]
+        valid_unassoc_c = unassoc_c[valid_mask_new]
+
+        # Vectorized Reprojection: Calculate all errors in two bulk passes
+        errs_prev = GeometryEngine.calculate_reprojection_errors(
+            pts3D_new, valid_unassoc_p, R_prev, t_prev, self.K
+        )
+        errs_curr = GeometryEngine.calculate_reprojection_errors(
+            pts3D_new, valid_unassoc_c, R_curr, t_curr, self.K
         )
 
-        for k in range(len(pts3D_new)):
-            pt3d = pts3D_new[k]
-            pt2d_p, pt2d_c = valid_unassoc_p[k], valid_unassoc_c[k]
+        # Average the errors and apply a boolean mask for points that pass the threshold
+        mean_errs = (errs_prev + errs_curr) / 2.0
+        ransac_mask = mean_errs <= config.ransac_threshold
 
-            # Calculate reprojection error against both camera poses
-            err_prev = GeometryEngine.calculate_reprojection_error(
-                np.array([pt3d]), np.array([pt2d_p]), R_prev, t_prev, self.K
-            )
-            err_curr = GeometryEngine.calculate_reprojection_error(
-                np.array([pt3d]), np.array([pt2d_c]), R_curr, t_curr, self.K
-            )
+        # Filter the arrays simultaneously
+        final_pts3D = pts3D_new[ransac_mask]
+        final_pts2D_p = valid_unassoc_p[ransac_mask]
+        final_pts2D_c = valid_unassoc_c[ransac_mask]
 
-            # Discard point if average reprojection error exceeds threshold
-            if np.mean([err_prev, err_curr]) > config.ransac_threshold:
-                continue
+        # Only loop over the surviving points for mapping and color extraction
+        for k in range(len(final_pts3D)):
+            pt3d = final_pts3D[k]
+            pt2d_p = final_pts2D_p[k]
+            pt2d_c = final_pts2D_c[k]
 
             x, y = int(pt2d_c[0]), int(pt2d_c[1])
             color = (

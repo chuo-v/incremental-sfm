@@ -97,6 +97,56 @@ def test_triangulate_and_filter_zero_w(mock_triangulate, monkeypatch):
     assert np.array_equal(mask, [False, True])
 
 
+def test_calculate_reprojection_errors_vectorized():
+    """Verifies that the vectorized reprojection error calculates correct L2 distances."""
+    # Simple camera setup at origin looking down +Z
+    K = np.array(
+        [[100.0, 0.0, 50.0], [0.0, 100.0, 50.0], [0.0, 0.0, 1.0]], dtype=np.float32
+    )
+    R = np.eye(3, dtype=np.float32)
+    t = np.zeros((3, 1), dtype=np.float32)
+
+    # 3D points at Z=10
+    obj_pts = np.array(
+        [
+            [0.0, 0.0, 10.0],  # Projects to (50, 50)
+            [1.0, 1.0, 10.0],  # Projects to (60, 60)
+        ],
+        dtype=np.float32,
+    )
+
+    # 2D observations with known pixel errors
+    # Point 1: Observed exactly at (50, 50) -> Error = 0
+    # Point 2: Observed at (63, 64) -> Expected at (60, 60) -> Error = sqrt(3^2 + 4^2) = 5
+    img_pts = np.array(
+        [
+            [50.0, 50.0],
+            [63.0, 64.0],
+        ],
+        dtype=np.float32,
+    )
+
+    errors = GeometryEngine.calculate_reprojection_errors(obj_pts, img_pts, R, t, K)
+
+    assert errors.shape == (2,)
+    assert np.isclose(errors[0], 0.0)
+    assert np.isclose(errors[1], 5.0)
+
+
+def test_calculate_reprojection_errors_empty():
+    """Tests the failsafe when passing empty arrays to the vectorized error calculator."""
+    K = np.eye(3, dtype=np.float32)
+    R = np.eye(3, dtype=np.float32)
+    t = np.zeros((3, 1), dtype=np.float32)
+
+    errors = GeometryEngine.calculate_reprojection_errors(
+        np.empty((0, 3)), np.empty((0, 2)), R, t, K
+    )
+
+    assert errors.size == 0
+    assert isinstance(errors, np.ndarray)
+
+
 @patch("cv2.solvePnPRansac")
 def test_solve_pnp_failure_handling(mock_solve_pnp):
     """Tests graceful failure when PnP cannot find a valid pose (e.g., lost tracking)."""

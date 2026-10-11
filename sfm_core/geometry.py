@@ -278,6 +278,39 @@ class GeometryEngine:
         return float(np.sqrt(np.mean(errors**2)))
 
     @staticmethod
+    def calculate_reprojection_errors(
+        obj_pts: np.ndarray,
+        img_pts: np.ndarray,
+        R: np.ndarray,
+        t: np.ndarray,
+        K: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Efficiently calculates individual reprojection errors for a batch of points.
+
+        Args:
+            obj_pts: (N, 3) array of triangulated 3D points.
+            img_pts: (N, 2) array of observed 2D image points.
+            R: 3x3 camera rotation matrix.
+            t: 3x1 camera translation vector.
+            K: 3x3 camera intrinsic matrix.
+
+        Returns:
+            np.ndarray: An (N,) array of reprojection errors in pixels.
+        """
+        if len(obj_pts) == 0:
+            return np.empty(0)
+
+        rvec, _ = cv2.Rodrigues(R)
+        projected_pts, _ = cv2.projectPoints(
+            np.float32(obj_pts), rvec, np.float32(t), K, None
+        )
+        projected_pts = projected_pts.reshape(-1, 2)
+
+        # Return the L2 distance (error in pixels) for each point
+        return np.linalg.norm(np.float32(img_pts) - projected_pts, axis=1)
+
+    @staticmethod
     def calculate_multi_view_reprojection_error(
         pt3d: np.ndarray,
         poses: list[tuple[np.ndarray, np.ndarray]],
