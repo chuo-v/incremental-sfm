@@ -24,6 +24,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
+pythonpath = ["."]
 filterwarnings = [
     'ignore:.*torch\.jit\.script.*is deprecated.*:FutureWarning',
     'ignore:.*torch\.cuda\.amp\.custom_fwd.*:FutureWarning'
