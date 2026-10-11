@@ -72,18 +72,6 @@ class IncrementalSfMEngine:
 
         return self.image_cache[index]
 
-    def _pt_key(self, pt: np.ndarray) -> tuple[float, float]:
-        """
-        Converts a 2D float point array into a rounded tuple for dictionary hashing.
-
-        Args:
-            pt (np.ndarray): The [x, y] coordinate array.
-
-        Returns:
-            tuple[float, float]: The rounded (x, y) coordinate tuple.
-        """
-        return (round(float(pt[0]), 4), round(float(pt[1]), 4))
-
     def initialize_two_view(self) -> bool:
         """
         Computes the initial two-view seed to bootstrap the 3D map.
@@ -125,11 +113,14 @@ class IncrementalSfMEngine:
         valid_pts0 = pts0[valid_mask]
         valid_pts1 = pts1[valid_mask]
 
+        # Vectorized key hashing for the map population
+        keys_0 = np.round(valid_pts0, 4)
+        keys_1 = np.round(valid_pts1, 4)
+
         # Populate the initial map and track features
         for i in range(len(pts3D)):
             pt3d = pts3D[i]
             pt2d_0 = valid_pts0[i]
-            pt2d_1 = valid_pts1[i]
 
             x, y = int(pt2d_0[0]), int(pt2d_0[1])
             color = (
@@ -142,7 +133,9 @@ class IncrementalSfMEngine:
             self.point_colors.append(color)
             point_idx = len(self.point_cloud) - 1
 
-            key_0, key_1 = self._pt_key(pt2d_0), self._pt_key(pt2d_1)
+            key_0 = (keys_0[i, 0], keys_0[i, 1])
+            key_1 = (keys_1[i, 0], keys_1[i, 1])
+
             self.last_frame_2d_to_3d[key_1] = point_idx
             self.obs2d_to_3d[(0, key_0)] = point_idx
             self.obs2d_to_3d[(1, key_1)] = point_idx
@@ -182,9 +175,12 @@ class IncrementalSfMEngine:
         obj_pts, img_pts, associated_3d_indices = [], [], []
         unassociated_prev, unassociated_curr = [], []
 
+        # Vectorized rounding to bypass function overhead during map lookups
+        keys_prev = np.round(pts_prev, 4)
+
         for j in range(len(pts_prev)):
             pt_p, pt_c = pts_prev[j], pts_curr[j]
-            key_p = self._pt_key(pt_p)
+            key_p = (keys_prev[j, 0], keys_prev[j, 1])
 
             if key_p in self.last_frame_2d_to_3d:
                 pt3d_idx = self.last_frame_2d_to_3d[key_p]
@@ -263,9 +259,14 @@ class IncrementalSfMEngine:
             ep_mask = ep_mask.flatten() == 1
             valid_prev, valid_curr = p_prev[ep_mask], p_curr[ep_mask]
 
+            # Vectorized key calculations for the cross-camera checks
+            keys_prev = np.round(valid_prev, 4)
+            keys_curr = np.round(valid_curr, 4)
+
             for j in range(len(valid_prev)):
                 pt_p, pt_c = valid_prev[j], valid_curr[j]
-                key_p, key_c = self._pt_key(pt_p), self._pt_key(pt_c)
+                key_p = (keys_prev[j, 0], keys_prev[j, 1])
+                key_c = (keys_curr[j, 0], keys_curr[j, 1])
 
                 obs_key = (prev_idx, key_p)
                 if obs_key in self.obs2d_to_3d:
@@ -277,8 +278,10 @@ class IncrementalSfMEngine:
                     curr_unassoc_multi[key_c]["track"].append((prev_idx, pt_p))
 
         # Inject surviving associations from the failed sequential attempt
+        keys_seq = np.round(seq_img_pts, 4) if len(seq_img_pts) > 0 else []
         for j in range(len(seq_img_pts)):
-            curr_to_3d_multi[self._pt_key(seq_img_pts[j])] = (
+            key_seq = (keys_seq[j, 0], keys_seq[j, 1])
+            curr_to_3d_multi[key_seq] = (
                 seq_img_pts[j],
                 seq_assoc_3d_indices[j],
             )
@@ -378,10 +381,13 @@ class IncrementalSfMEngine:
         final_pts2D_p = valid_unassoc_p[ransac_mask]
         final_pts2D_c = valid_unassoc_c[ransac_mask]
 
+        # Vectorized key calculations for the final insertion loop
+        keys_p = np.round(final_pts2D_p, 4)
+        keys_c = np.round(final_pts2D_c, 4)
+
         # Only loop over the surviving points for mapping and color extraction
         for k in range(len(final_pts3D)):
             pt3d = final_pts3D[k]
-            pt2d_p = final_pts2D_p[k]
             pt2d_c = final_pts2D_c[k]
 
             x, y = int(pt2d_c[0]), int(pt2d_c[1])
@@ -395,7 +401,9 @@ class IncrementalSfMEngine:
             self.point_colors.append(color)
             pt3d_idx = len(self.point_cloud) - 1
 
-            key_p, key_c = self._pt_key(pt2d_p), self._pt_key(pt2d_c)
+            key_p = (keys_p[k, 0], keys_p[k, 1])
+            key_c = (keys_c[k, 0], keys_c[k, 1])
+
             new_2d_to_3d[key_c] = pt3d_idx
             self.obs2d_to_3d[(last_success_idx, key_p)] = pt3d_idx
             self.obs2d_to_3d[(curr_idx, key_c)] = pt3d_idx
@@ -461,11 +469,13 @@ class IncrementalSfMEngine:
                     self.point_cloud.append(pt3d)
                     self.point_colors.append(color)
                     pt3d_idx = len(self.point_cloud) - 1
+
                     new_2d_to_3d[key_c] = pt3d_idx
                     self.obs2d_to_3d[(curr_idx, key_c)] = pt3d_idx
 
                     for prev_idx, pt_p in track:
-                        self.obs2d_to_3d[(prev_idx, self._pt_key(pt_p))] = pt3d_idx
+                        key_p = (round(float(pt_p[0]), 4), round(float(pt_p[1]), 4))
+                        self.obs2d_to_3d[(prev_idx, key_p)] = pt3d_idx
 
                     num_triangulated += 1
 
@@ -552,10 +562,12 @@ class IncrementalSfMEngine:
 
             # Set up the tracker for the newly registered image (preserving surviving PnP inliers)
             new_2d_to_3d = {}
+            keys_img_pts = np.round(img_pts, 4) if len(img_pts) > 0 else []
+
             for inlier_idx in inlier_mask:
-                pt_curr = img_pts[inlier_idx]
                 pt3d_idx = associated_3d_indices[inlier_idx]
-                key_c = self._pt_key(pt_curr)
+                key_c = (keys_img_pts[inlier_idx, 0], keys_img_pts[inlier_idx, 1])
+
                 new_2d_to_3d[key_c] = pt3d_idx
                 self.obs2d_to_3d[(i, key_c)] = pt3d_idx
 
