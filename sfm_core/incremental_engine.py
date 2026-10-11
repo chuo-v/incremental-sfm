@@ -40,6 +40,7 @@ class IncrementalSfMEngine:
         self.point_cloud = []
         self.point_colors = []
         self.camera_poses = {}
+        self.camera_projections = {}
         self.image_cache = {}
 
         # Local tracker for high-speed sequential matching
@@ -104,7 +105,9 @@ class IncrementalSfMEngine:
         R0 = np.eye(3, dtype=np.float32)
         t0 = np.zeros((3, 1), dtype=np.float32)
         self.camera_poses[0] = (R0, t0)
+        self.camera_projections[0] = self.K @ np.hstack((R0, t0))
         self.camera_poses[1] = (R1, t1)
+        self.camera_projections[1] = self.K @ np.hstack((R1, t1))
 
         pts3D, valid_mask = GeometryEngine.triangulate_and_filter(
             pts0, pts1, self.K, R0, t0, R1, t1
@@ -434,29 +437,32 @@ class IncrementalSfMEngine:
             int: The number of valid multi-view 3D points successfully triangulated and mapped.
         """
         num_triangulated = 0
-        R_curr, t_curr = self.camera_poses[curr_idx]
 
         for key_c, data in curr_unassoc_multi.items():
             pt_c = data["pt_c"]
             track = data["track"]
 
-            poses = [self.camera_poses[prev_idx] for prev_idx, _ in track] + [
-                (R_curr, t_curr)
-            ]
+            # Pull precomputed P matrices instead of manual pose reconstructions
+            P_matrices = [
+                self.camera_projections[prev_idx] for prev_idx, _ in track
+            ] + [self.camera_projections[curr_idx]]
             pts2d = [pt_p for _, pt_p in track] + [pt_c]
 
-            pt3d = GeometryEngine.triangulate_n_views(poses, pts2d, self.K)
+            pt3d = GeometryEngine.triangulate_n_views(P_matrices, pts2d)
 
             valid = True
-            for R, t in poses:
-                cam_pt = R @ pt3d.reshape(3, 1) + t
-                if cam_pt[2, 0] <= 0:
+            X_homog = np.append(pt3d, 1.0)
+
+            # The 3rd row of P computes Z in camera space.
+            # Reject points that fall behind any camera (cheirality check).
+            for P in P_matrices:
+                if P[2, :] @ X_homog <= 0:
                     valid = False
                     break
 
             if valid:
                 mean_err = GeometryEngine.calculate_multi_view_reprojection_error(
-                    pt3d, poses, pts2d, self.K
+                    pt3d, P_matrices, pts2d
                 )
                 if mean_err < config.ransac_threshold:
                     x, y = int(pt_c[0]), int(pt_c[1])
@@ -551,6 +557,7 @@ class IncrementalSfMEngine:
             # MAPPING
             # -------------------------------------------------------------
             self.camera_poses[i] = (R_curr, t_curr)
+            self.camera_projections[i] = self.K @ np.hstack((R_curr, t_curr))
 
             inlier_obj_pts = np.array(obj_pts)[inlier_mask]
             inlier_img_pts = np.array(img_pts)[inlier_mask]

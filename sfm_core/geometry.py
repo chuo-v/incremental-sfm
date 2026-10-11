@@ -205,39 +205,33 @@ class GeometryEngine:
 
     @staticmethod
     def triangulate_n_views(
-        poses: list[tuple[np.ndarray, np.ndarray]],
+        P_matrices: list[np.ndarray],
         pts2d: list[np.ndarray],
-        K: np.ndarray,
     ) -> np.ndarray:
         """
         Multi-View Triangulation using Direct Linear Transform (DLT).
         Mathematically intersects rays from N cameras using SVD to reduce depth uncertainty.
 
         Args:
-            poses: List of (R, t) tuples representing the poses of N cameras.
+            P_matrices: List of 3x4 projection matrices for N cameras.
             pts2d: List of (2,) arrays representing the 2D coordinates in each camera view.
-            K: 3x3 camera intrinsic matrix.
 
         Returns:
             X: (3,) array representing the triangulated 3D point in Cartesian coordinates.
                Returns a zero array if the point is at infinity.
         """
         A = []
-        for (R, t), pt in zip(poses, pts2d):
-            P = K @ np.hstack((R, t))
+        for P, pt in zip(P_matrices, pts2d):
             x, y = pt[0], pt[1]
-
             A.append(x * P[2, :] - P[0, :])
             A.append(y * P[2, :] - P[1, :])
 
         A = np.array(A)
-
         _, _, Vt = np.linalg.svd(A)
         X = Vt[-1]
 
         if np.abs(X[3]) < 1e-7:
             return np.zeros(3)
-
         return X[:3] / X[3]
 
     @staticmethod
@@ -313,28 +307,32 @@ class GeometryEngine:
     @staticmethod
     def calculate_multi_view_reprojection_error(
         pt3d: np.ndarray,
-        poses: list[tuple[np.ndarray, np.ndarray]],
+        P_matrices: list[np.ndarray],
         pts2d: list[np.ndarray],
-        K: np.ndarray,
     ) -> float:
         """
         Efficiently calculates the Root Mean Square Error (RMSE) of a 3D point
-        projected across multiple camera poses using direct pinhole projection
-        (assuming zero distortion).
+        projected across multiple camera poses using precomputed projection matrices
+        and homogeneous coordinates (assuming zero distortion).
         """
-        fx, fy, cx, cy = K[0, 0], K[1, 1], K[0, 2], K[1, 2]
-        X = np.asarray(pt3d, dtype=np.float32).reshape(3, 1)
+        # Convert 3D point to homogeneous coordinates (Shape: (4,))
+        X_homog = np.append(pt3d, 1.0)
         squared_errors = []
-        for (R, t), pt2d in zip(poses, pts2d):
-            X_cam = R @ X + t
-            z = X_cam[2, 0]
+
+        for P, pt2d in zip(P_matrices, pts2d):
+            uvw = P @ X_homog
+            z = uvw[2]
+
             if z <= 0:
                 return float("inf")
-            u = fx * (X_cam[0, 0] / z) + cx
-            v = fy * (X_cam[1, 0] / z) + cy
+
+            # Normalize by depth (Z) to get image plane coordinates
+            u = uvw[0] / z
+            v = uvw[1] / z
             dx = u - pt2d[0]
             dy = v - pt2d[1]
             squared_errors.append(dx * dx + dy * dy)
+
         if not squared_errors:
             return 0.0
         return float(np.sqrt(np.mean(squared_errors)))
