@@ -147,6 +147,77 @@ def test_calculate_reprojection_errors_empty():
     assert isinstance(errors, np.ndarray)
 
 
+def test_triangulate_n_views():
+    """Verifies multi-view triangulation (DLT) across 3 cameras."""
+    # Simple intrinsic matrix
+    K = np.array(
+        [[100.0, 0.0, 50.0], [0.0, 100.0, 50.0], [0.0, 0.0, 1.0]], dtype=np.float32
+    )
+
+    # Camera 1: Origin
+    P1 = K @ np.hstack((np.eye(3), np.zeros((3, 1))))
+
+    # Camera 2: Shifted by 2 units on X axis (t = [-2, 0, 0]^T)
+    P2 = K @ np.hstack((np.eye(3), np.array([[-2.0], [0.0], [0.0]])))
+
+    # Camera 3: Shifted by 2 units on Y axis (t = [0, -2, 0]^T)
+    P3 = K @ np.hstack((np.eye(3), np.array([[0.0], [-2.0], [0.0]])))
+
+    P_matrices = [P1, P2, P3]
+
+    # 3D Point at [0, 0, 10] projects to:
+    # Cam 1: [50, 50]
+    # Cam 2: [30, 50]
+    # Cam 3: [50, 30]
+    pts2d = [np.array([50.0, 50.0]), np.array([30.0, 50.0]), np.array([50.0, 30.0])]
+
+    pt3d = GeometryEngine.triangulate_n_views(P_matrices, pts2d)
+
+    assert pt3d.shape == (3,)
+    assert np.allclose(pt3d, [0.0, 0.0, 10.0], atol=1e-5)
+
+
+def test_calculate_multi_view_reprojection_error():
+    """Verifies RMSE calculation across multiple projection matrices."""
+    K = np.array(
+        [[100.0, 0.0, 50.0], [0.0, 100.0, 50.0], [0.0, 0.0, 1.0]], dtype=np.float32
+    )
+
+    P1 = K @ np.hstack((np.eye(3), np.zeros((3, 1))))
+    P2 = K @ np.hstack((np.eye(3), np.array([[-2.0], [0.0], [0.0]])))
+    P_matrices = [P1, P2]
+
+    pt3d = np.array([0.0, 0.0, 10.0])
+
+    # Expected projections: [50, 50] and [30, 50]
+    # Introduce an error of 3px (X) and 4px (Y) for Cam 1 -> Euclidean Distance = 5px, Squared = 25
+    # Cam 2 is perfectly observed -> Distance = 0px, Squared = 0
+    # Mean Squared Error = 25 / 2 = 12.5
+    pts2d = [np.array([53.0, 54.0]), np.array([30.0, 50.0])]
+
+    error = GeometryEngine.calculate_multi_view_reprojection_error(
+        pt3d, P_matrices, pts2d
+    )
+
+    expected_rmse = np.sqrt(12.5)
+    assert np.isclose(error, expected_rmse)
+
+
+def test_calculate_multi_view_reprojection_error_behind_camera():
+    """Verifies that points falling behind a camera (cheirality failure) return infinity."""
+    K = np.array(
+        [[100.0, 0.0, 50.0], [0.0, 100.0, 50.0], [0.0, 0.0, 1.0]], dtype=np.float32
+    )
+    P1 = K @ np.hstack((np.eye(3), np.zeros((3, 1))))
+
+    # Point behind the camera (Z = -10)
+    pt3d = np.array([0.0, 0.0, -10.0])
+    pts2d = [np.array([50.0, 50.0])]
+
+    error = GeometryEngine.calculate_multi_view_reprojection_error(pt3d, [P1], pts2d)
+    assert error == float("inf")
+
+
 @patch("cv2.solvePnPRansac")
 def test_solve_pnp_failure_handling(mock_solve_pnp):
     """Tests graceful failure when PnP cannot find a valid pose (e.g., lost tracking)."""
