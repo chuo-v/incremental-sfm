@@ -324,7 +324,7 @@ def test_orb_matcher_clahe_applied(monkeypatch):
 # Caching Tests
 # ---------------------------------------------------------
 def test_feature_caching_and_eviction(monkeypatch):
-    """Verifies that the feature cache stores, retrieves, and evicts correctly based on config."""
+    """Verifies that the feature cache stores, retrieves, and evicts correctly based on config LRU policy."""
     # Force a tiny cache size to easily test eviction
     monkeypatch.setattr(config, "max_cache_size", 2)
     matcher = SIFTMatcher()
@@ -333,24 +333,28 @@ def test_feature_caching_and_eviction(monkeypatch):
     matcher._extract = MagicMock(return_value=(["kp_mock"], ["des_mock"]))
     img_dummy = np.zeros((10, 10), dtype=np.uint8)
 
-    # 1. First image (Cache Miss -> Extracted and Stored)
+    # 1. Cache idx=0 (Cache Miss -> Extracted and Stored)
     matcher._get_features(img_dummy, idx=0)
     assert matcher._extract.call_count == 1
     assert 0 in matcher.feature_cache
 
-    # 2. Same image requested again (Cache Hit -> Pulled from RAM)
-    matcher._get_features(img_dummy, idx=0)
-    assert matcher._extract.call_count == 1  # Call count stays at 1
-
-    # 3. Add second image (Cache Miss -> Extracted and Stored)
+    # 2. Cache idx=1 (Cache Miss -> Extracted and Stored)
     matcher._get_features(img_dummy, idx=1)
     assert matcher._extract.call_count == 2
     assert len(matcher.feature_cache) == 2
 
-    # 4. Add third image (Triggers eviction of the oldest entry: idx 0)
+    # 3. Access idx=0 again (Cache Hit -> Pulled from RAM)
+    # This promotes idx=0 to Most Recently Used. idx=1 is now Least Recently Used.
+    matcher._get_features(img_dummy, idx=0)
+    assert matcher._extract.call_count == 2  # Call count stays at 2
+
+    # 4. Cache idx=2 (Cache Miss -> Extracted and Stored)
+    # Triggers eviction of the Least Recently Used entry (idx 1).
     matcher._get_features(img_dummy, idx=2)
     assert matcher._extract.call_count == 3
     assert len(matcher.feature_cache) == 2
-    assert 0 not in matcher.feature_cache
-    assert 1 in matcher.feature_cache
-    assert 2 in matcher.feature_cache
+
+    # Verify strict LRU eviction
+    assert 1 not in matcher.feature_cache  # Evicted because it was Least Recently Used
+    assert 0 in matcher.feature_cache  # Retained because it was recently accessed
+    assert 2 in matcher.feature_cache  # Retained because it was just added
