@@ -120,31 +120,27 @@ class IncrementalSfMEngine:
         valid_pts1 = pts1[valid_mask]
 
         # Vectorized key hashing for the map population
-        keys_0 = np.round(valid_pts0, 4)
-        keys_1 = np.round(valid_pts1, 4)
+        keys_0 = [tuple(p) for p in np.round(valid_pts0, 4).tolist()]
+        keys_1 = [tuple(p) for p in np.round(valid_pts1, 4).tolist()]
 
-        # Populate the initial map and track features
+        # Vectorized color extraction
+        x_coords = np.clip(valid_pts0[:, 0].astype(int), 0, rgb0.shape[1] - 1)
+        y_coords = np.clip(valid_pts0[:, 1].astype(int), 0, rgb0.shape[0] - 1)
+        colors = rgb0[y_coords, x_coords]
+
+        # Bulk map insertion
+        start_idx = len(self.point_cloud)
+        self.point_cloud.extend(pts3D)
+        self.point_colors.extend(colors)
+
+        # Loop for tracker dictionary updates
         for i in range(len(pts3D)):
-            pt3d = pts3D[i]
-            pt2d_0 = valid_pts0[i]
+            pt3d_idx = start_idx + i
+            key_0, key_1 = keys_0[i], keys_1[i]
 
-            x, y = int(pt2d_0[0]), int(pt2d_0[1])
-            color = (
-                rgb0[y, x]
-                if 0 <= y < rgb0.shape[0] and 0 <= x < rgb0.shape[1]
-                else np.array([0, 0, 0])
-            )
-
-            self.point_cloud.append(pt3d)
-            self.point_colors.append(color)
-            point_idx = len(self.point_cloud) - 1
-
-            key_0 = (keys_0[i, 0], keys_0[i, 1])
-            key_1 = (keys_1[i, 0], keys_1[i, 1])
-
-            self.last_frame_2d_to_3d[key_1] = point_idx
-            self.obs2d_to_3d[(0, key_0)] = point_idx
-            self.obs2d_to_3d[(1, key_1)] = point_idx
+            self.last_frame_2d_to_3d[key_1] = pt3d_idx
+            self.obs2d_to_3d[(0, key_0)] = pt3d_idx
+            self.obs2d_to_3d[(1, key_1)] = pt3d_idx
 
         # Calculate and log the baseline RMSE for the seed
         rmse = GeometryEngine.calculate_reprojection_error(
@@ -392,36 +388,29 @@ class IncrementalSfMEngine:
         final_pts2D_c = valid_unassoc_c[ransac_mask]
 
         # Vectorized key calculations for the final insertion loop
-        keys_p = np.round(final_pts2D_p, 4)
-        keys_c = np.round(final_pts2D_c, 4)
+        keys_p = [tuple(p) for p in np.round(final_pts2D_p, 4).tolist()]
+        keys_c = [tuple(p) for p in np.round(final_pts2D_c, 4).tolist()]
 
-        # Only loop over the surviving points for mapping and color extraction
+        # Vectorized color extraction
+        x_coords = np.clip(final_pts2D_c[:, 0].astype(int), 0, rgb_curr.shape[1] - 1)
+        y_coords = np.clip(final_pts2D_c[:, 1].astype(int), 0, rgb_curr.shape[0] - 1)
+        colors = rgb_curr[y_coords, x_coords]
+
+        # Bulk map insertion
+        start_idx = len(self.point_cloud)
+        self.point_cloud.extend(final_pts3D)
+        self.point_colors.extend(colors)
+
+        # Loop for tracker dictionary updates
         for k in range(len(final_pts3D)):
-            pt3d = final_pts3D[k]
-            pt2d_c = final_pts2D_c[k]
-
-            x, y = int(pt2d_c[0]), int(pt2d_c[1])
-            color = (
-                rgb_curr[y, x]
-                if 0 <= y < rgb_curr.shape[0] and 0 <= x < rgb_curr.shape[1]
-                else np.array([0, 0, 0])
-            )
-
-            self.point_cloud.append(pt3d)
-            self.point_colors.append(color)
-            pt3d_idx = len(self.point_cloud) - 1
-
-            key_p = (keys_p[k, 0], keys_p[k, 1])
-            key_c = (keys_c[k, 0], keys_c[k, 1])
+            pt3d_idx = start_idx + k
+            key_p, key_c = keys_p[k], keys_c[k]
 
             new_2d_to_3d[key_c] = pt3d_idx
             self.obs2d_to_3d[(last_success_idx, key_p)] = pt3d_idx
             self.obs2d_to_3d[(curr_idx, key_c)] = pt3d_idx
 
-            # Increment valid triangulated count
-            num_triangulated += 1
-
-        return num_triangulated
+        return len(final_pts3D)
 
     def _triangulate_n_view(
         self,
