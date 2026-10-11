@@ -99,7 +99,7 @@ class IncrementalSfMEngine:
         rgb0, gray0 = self._get_cached_image(0)
         _, gray1 = self._get_cached_image(1)
 
-        pts0, pts1 = self.matcher.match(gray0, gray1)
+        pts0, pts1 = self.matcher.match(gray0, gray1, idx1=0, idx2=1)
         if len(pts0) < 8:
             return False
 
@@ -249,7 +249,9 @@ class IncrementalSfMEngine:
                 continue
 
             _, g_prev = self._get_cached_image(prev_idx)
-            p_prev, p_curr = self.matcher.match(g_prev, gray_curr)
+            p_prev, p_curr = self.matcher.match(
+                g_prev, gray_curr, idx1=prev_idx, idx2=curr_idx
+            )
 
             if len(p_prev) < 8:
                 continue
@@ -486,7 +488,9 @@ class IncrementalSfMEngine:
             rgb_curr, gray_curr = self._get_cached_image(i)
             rgb_prev, gray_prev = self._get_cached_image(last_success_idx)
 
-            pts_prev, pts_curr = self.matcher.match(gray_prev, gray_curr)
+            pts_prev, pts_curr = self.matcher.match(
+                gray_prev, gray_curr, idx1=last_success_idx, idx2=i
+            )
 
             # -------------------------------------------------------------
             # TRACKING

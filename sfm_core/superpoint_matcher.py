@@ -23,6 +23,7 @@ class SuperPointMatcher(BaseFeatureMatcher):
         Automatically detects and assigns the models to the optimal available
         hardware accelerator (CUDA, MPS, or CPU) and configures optional pre-processing.
         """
+        super().__init__()
         if torch.cuda.is_available():
             self.device = torch.device("cuda")
         elif torch.backends.mps.is_available():
@@ -55,37 +56,45 @@ class SuperPointMatcher(BaseFeatureMatcher):
         tensor = torch.from_numpy(img).float() / 255.0
         return tensor.unsqueeze(0).unsqueeze(0).to(self.device)
 
+    def _extract(self, img: np.ndarray):
+        """
+        Extracts SuperPoint feature tensors from a single image.
+        Pre-processes the image into a normalized PyTorch tensor before extraction.
+        """
+        if self.clahe is not None:
+            img = self.clahe.apply(img)
+        tensor = self._preprocess_image(img)
+        with torch.no_grad():
+            feats = self.extractor.extract(tensor)
+        return feats
+
     def match(
-        self, img1: np.ndarray, img2: np.ndarray
+        self, img1: np.ndarray, img2: np.ndarray, idx1: int = None, idx2: int = None
     ) -> tuple[np.ndarray, np.ndarray]:
         """
-        Detects and matches features between two images using SuperPoint and LightGlue.
+        Retrieves cached SuperPoint features or extracts new ones from two grayscale images,
+        then delegates matching to the LightGlue neural network.
+
         Args:
             img1: (H, W) grayscale array of the first image.
             img2: (H, W) grayscale array of the second image.
+            idx1 (int, optional): The sequential index of the first image for cache retrieval/storage.
+            idx2 (int, optional): The sequential index of the second image for cache retrieval/storage.
+
         Returns:
             pts1: (N, 2) array of matched (x, y) coordinates in the first image.
             pts2: (N, 2) array of matched (x, y) coordinates in the second image.
         """
-        # Pre-process with CLAHE to enhance local contrast for better gradients
-        if self.clahe is not None:
-            img1 = self.clahe.apply(img1)
-            img2 = self.clahe.apply(img2)
-
-        # Convert NumPy arrays to PyTorch tensors
-        tensor1 = self._preprocess_image(img1)
-        tensor2 = self._preprocess_image(img2)
+        feats1 = self._get_features(img1, idx1)
+        feats2 = self._get_features(img2, idx2)
 
         with torch.no_grad():
-            # Extract keypoints and descriptors
-            feats1 = self.extractor.extract(tensor1)
-            feats2 = self.extractor.extract(tensor2)
             # Perform feature matching
             matches01 = self.matcher({"image0": feats1, "image1": feats2})
 
         # Remove the batch dimension using LightGlue's utility function
-        feats1 = rbd(feats1)
-        feats2 = rbd(feats2)
+        f1 = rbd(feats1)
+        f2 = rbd(feats2)
         matches01 = rbd(matches01)
 
         # Extract the matched index pairs (M, 2)
@@ -96,7 +105,7 @@ class SuperPointMatcher(BaseFeatureMatcher):
             return np.empty((0, 2)), np.empty((0, 2))
 
         # Gather the matched keypoint coordinates and push back to CPU/NumPy
-        pts1 = feats1["keypoints"][match_indices[..., 0]].cpu().numpy()
-        pts2 = feats2["keypoints"][match_indices[..., 1]].cpu().numpy()
+        pts1 = f1["keypoints"][match_indices[..., 0]].cpu().numpy()
+        pts2 = f2["keypoints"][match_indices[..., 1]].cpu().numpy()
 
         return pts1, pts2

@@ -13,6 +13,34 @@ class BaseFeatureMatcher(ABC):
     it must output matched points as two aligned (N, 2) NumPy arrays.
     """
 
+    def __init__(self):
+        self.feature_cache = {}
+
+    def _get_features(self, img: np.ndarray, idx: int | None):
+        """
+        Retrieves features from the cache if available, otherwise extracts and caches them.
+        Enforces a maximum cache limit to prevent OOM errors.
+        """
+        if idx is not None and idx in self.feature_cache:
+            return self.feature_cache[idx]
+
+        features = self._extract(img)
+
+        if idx is not None:
+            if len(self.feature_cache) >= config.max_cache_size:
+                oldest_key = next(iter(self.feature_cache))
+                del self.feature_cache[oldest_key]
+            self.feature_cache[idx] = features
+
+        return features
+
+    @abstractmethod
+    def _extract(self, img: np.ndarray):
+        """
+        Executes the algorithm-specific extraction on a single image.
+        """
+        pass
+
     def _bidirectional_match(
         self,
         matcher,
@@ -77,15 +105,20 @@ class BaseFeatureMatcher(ABC):
 
     @abstractmethod
     def match(
-        self, img1: np.ndarray, img2: np.ndarray
+        self, img1: np.ndarray, img2: np.ndarray, idx1: int = None, idx2: int = None
     ) -> tuple[np.ndarray, np.ndarray]:
         """
         Extracts features from two images and finds reliable matches between them.
+        Accepts optional image indices to pull from the feature cache.
+
         Args:
             img1 (np.ndarray): The first image (typically grayscale).
             img2 (np.ndarray): The second image (typically grayscale).
+            idx1 (int, optional): The sequential index of the first image. Used to retrieve or store extracted features in the cache.
+            idx2 (int, optional): The sequential index of the second image. Used to retrieve or store extracted features in the cache.
+
         Returns:
-            Tuple[np.ndarray, np.ndarray]:
+            tuple[np.ndarray, np.ndarray]:
                 - pts1: An (N, 2) array of (x, y) coordinates in img1.
                 - pts2: An (N, 2) array of corresponding (x, y) coordinates in img2.
                 Note: The arrays must be aligned. pts1[i] must be the match for pts2[i].

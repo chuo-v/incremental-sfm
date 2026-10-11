@@ -318,3 +318,39 @@ def test_orb_matcher_clahe_applied(monkeypatch):
 
     # Verify CLAHE was applied exactly twice (once per image)
     assert matcher.clahe.apply.call_count == 2
+
+
+# ---------------------------------------------------------
+# Caching Tests
+# ---------------------------------------------------------
+def test_feature_caching_and_eviction(monkeypatch):
+    """Verifies that the feature cache stores, retrieves, and evicts correctly based on config."""
+    # Force a tiny cache size to easily test eviction
+    monkeypatch.setattr(config, "max_cache_size", 2)
+    matcher = SIFTMatcher()
+
+    # Mock the extraction method to track how many times it actually processes an image
+    matcher._extract = MagicMock(return_value=(["kp_mock"], ["des_mock"]))
+    img_dummy = np.zeros((10, 10), dtype=np.uint8)
+
+    # 1. First image (Cache Miss -> Extracted and Stored)
+    matcher._get_features(img_dummy, idx=0)
+    assert matcher._extract.call_count == 1
+    assert 0 in matcher.feature_cache
+
+    # 2. Same image requested again (Cache Hit -> Pulled from RAM)
+    matcher._get_features(img_dummy, idx=0)
+    assert matcher._extract.call_count == 1  # Call count stays at 1
+
+    # 3. Add second image (Cache Miss -> Extracted and Stored)
+    matcher._get_features(img_dummy, idx=1)
+    assert matcher._extract.call_count == 2
+    assert len(matcher.feature_cache) == 2
+
+    # 4. Add third image (Triggers eviction of the oldest entry: idx 0)
+    matcher._get_features(img_dummy, idx=2)
+    assert matcher._extract.call_count == 3
+    assert len(matcher.feature_cache) == 2
+    assert 0 not in matcher.feature_cache
+    assert 1 in matcher.feature_cache
+    assert 2 in matcher.feature_cache
