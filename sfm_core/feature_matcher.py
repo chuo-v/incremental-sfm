@@ -19,10 +19,21 @@ class BaseFeatureMatcher(ABC):
     def _get_features(self, img: np.ndarray, idx: int | None):
         """
         Retrieves features from the cache if available, otherwise extracts and caches them.
-        Enforces a maximum cache limit to prevent OOM errors.
+        Enforces a maximum cache limit using LRU eviction to prevent OOM errors.
+
+        Args:
+            img (np.ndarray): The image array to extract features from if not cached.
+            idx (int | None): The sequential index of the image, used as the cache key.
+                              If None, caching is bypassed.
+
+        Returns:
+            tuple: The extracted keypoints and descriptors/tensors for the image.
         """
         if idx is not None and idx in self.feature_cache:
-            return self.feature_cache[idx]
+            # LRU Refresh
+            features = self.feature_cache.pop(idx)
+            self.feature_cache[idx] = features
+            return features
 
         features = self._extract(img)
 
