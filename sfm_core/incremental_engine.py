@@ -182,11 +182,11 @@ class IncrementalSfMEngine:
         unassociated_prev, unassociated_curr = [], []
 
         # Vectorized rounding to bypass function overhead during map lookups
-        keys_prev = np.round(pts_prev, 4)
+        keys_prev = [tuple(p) for p in np.round(pts_prev, 4).tolist()]
 
         for j in range(len(pts_prev)):
             pt_p, pt_c = pts_prev[j], pts_curr[j]
-            key_p = (keys_prev[j, 0], keys_prev[j, 1])
+            key_p = keys_prev[j]
 
             if key_p in self.last_frame_2d_to_3d:
                 pt3d_idx = self.last_frame_2d_to_3d[key_p]
@@ -266,13 +266,12 @@ class IncrementalSfMEngine:
             valid_prev, valid_curr = p_prev[ep_mask], p_curr[ep_mask]
 
             # Vectorized key calculations for the cross-camera checks
-            keys_prev = np.round(valid_prev, 4)
-            keys_curr = np.round(valid_curr, 4)
+            keys_prev = [tuple(p) for p in np.round(valid_prev, 4).tolist()]
+            keys_curr = [tuple(p) for p in np.round(valid_curr, 4).tolist()]
 
             for j in range(len(valid_prev)):
                 pt_p, pt_c = valid_prev[j], valid_curr[j]
-                key_p = (keys_prev[j, 0], keys_prev[j, 1])
-                key_c = (keys_curr[j, 0], keys_curr[j, 1])
+                key_p, key_c = keys_prev[j], keys_curr[j]
 
                 obs_key = (prev_idx, key_p)
                 if obs_key in self.obs2d_to_3d:
@@ -284,9 +283,14 @@ class IncrementalSfMEngine:
                     curr_unassoc_multi[key_c]["track"].append((prev_idx, pt_p))
 
         # Inject surviving associations from the failed sequential attempt
-        keys_seq = np.round(seq_img_pts, 4) if len(seq_img_pts) > 0 else []
+        keys_seq = (
+            [tuple(p) for p in np.round(seq_img_pts, 4).tolist()]
+            if len(seq_img_pts) > 0
+            else []
+        )
         for j in range(len(seq_img_pts)):
-            key_seq = (keys_seq[j, 0], keys_seq[j, 1])
+            key_seq = keys_seq[j]
+
             curr_to_3d_multi[key_seq] = (
                 seq_img_pts[j],
                 seq_assoc_3d_indices[j],
@@ -572,11 +576,15 @@ class IncrementalSfMEngine:
 
             # Set up the tracker for the newly registered image (preserving surviving PnP inliers)
             new_2d_to_3d = {}
-            keys_img_pts = np.round(img_pts, 4) if len(img_pts) > 0 else []
+            keys_img_pts = (
+                [tuple(p) for p in np.round(img_pts, 4).tolist()]
+                if len(img_pts) > 0
+                else []
+            )
 
             for inlier_idx in inlier_mask:
                 pt3d_idx = associated_3d_indices[inlier_idx]
-                key_c = (keys_img_pts[inlier_idx, 0], keys_img_pts[inlier_idx, 1])
+                key_c = keys_img_pts[inlier_idx]
 
                 new_2d_to_3d[key_c] = pt3d_idx
                 self.obs2d_to_3d[(i, key_c)] = pt3d_idx
